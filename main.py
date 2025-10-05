@@ -1,18 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse
+import requests
+import os
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, and_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 import random
 
+# --- Настройки ---
+IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "819c3afe10daa867a50816100412c7bd")  # замени на свой!
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+
+# --- База данных ---
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- Модели ---
 class UserDB(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -30,8 +34,8 @@ class UserDB(Base):
 class LikeDB(Base):
     __tablename__ = "likes"
     id = Column(Integer, primary_key=True, index=True)
-    from_user_id = Column(Integer, index=True)  # кто лайкнул
-    to_user_id = Column(Integer, index=True)    # кого лайкнули
+    from_user_id = Column(Integer, index=True)
+    to_user_id = Column(Integer, index=True)
     is_mutual = Column(Boolean, default=False)
 
 Base.metadata.create_all(bind=engine)
@@ -83,7 +87,7 @@ class ProfileUpdate(BaseModel):
     interests: list = []
 
 @app.post("/api/profile")
-def update_profile(data: ProfileUpdate):
+def update_profile( ProfileUpdate):
     db = SessionLocal()
     user = db.query(UserDB).filter(UserDB.tg_id == data.tg_id).first()
     if not user:
@@ -96,6 +100,38 @@ def update_profile(data: ProfileUpdate):
     db.commit()
     db.close()
     return {"status": "ok"}
+
+# --- НОВОЕ: Загрузка фото ---
+@app.post("/api/upload-photo")
+async def upload_photo(tg_id: int, file: UploadFile = File(...)):
+    # Сохраняем файл временно
+    contents = await file.read()
+    temp_path = f"/tmp/{file.filename}"
+    with open(temp_path, "wb") as f:
+        f.write(contents)
+
+    # Отправляем в ImgBB
+    with open(temp_path, "rb") as f:
+        response = requests.post(
+            "https://api.imgbb.com/1/upload",
+            data={"key": IMGBB_API_KEY},
+            files={"image": f}
+        )
+    
+    os.remove(temp_path)
+    if response.status_code != 200:
+        raise HTTPException(500, "Не удалось загрузить фото")
+    
+    photo_url = response.json()["data"]["url"]
+
+    # Сохраняем в базу
+    db = SessionLocal()
+    user = db.query(UserDB).filter(UserDB.tg_id == tg_id).first()
+    if user:
+        user.photo_url = photo_url
+        db.commit()
+    db.close()
+    return {"photo_url": photo_url}
 
 @app.get("/api/user/{tg_id}")
 def get_user(tg_id: int):
@@ -116,14 +152,12 @@ def get_user(tg_id: int):
         "photo_url": user.photo_url
     }
 
-# --- НОВОЕ: Получить случайного пользователя для поиска ---
 @app.get("/api/search")
 def search_users(current_user_id: int):
     db = SessionLocal()
-    # Исключаем себя и тех, кого уже лайкал
     liked_ids = db.query(LikeDB.to_user_id).filter(LikeDB.from_user_id == current_user_id).all()
     liked_ids = [x[0] for x in liked_ids]
-    liked_ids.append(current_user_id)  # не показывать себя
+    liked_ids.append(current_user_id)
 
     users = db.query(UserDB).filter(
         and_(
@@ -135,7 +169,6 @@ def search_users(current_user_id: int):
     if not users:
         return {"user": None}
 
-    # Берём случайного
     random_user = random.choice(users)
     db.close()
     return {
@@ -147,19 +180,18 @@ def search_users(current_user_id: int):
             "height": random_user.height,
             "weight": random_user.weight,
             "interests": random_user.interests.split(",") if random_user.interests else [],
-            "username": random_user.username
+            "username": random_user.username,
+            "photo_url": random_user.photo_url
         }
     }
 
-# --- НОВОЕ: Поставить лайк ---
 class LikeRequest(BaseModel):
     from_user_id: int
     to_user_id: int
 
 @app.post("/api/like")
-def like_user(data: LikeRequest):
+def like_user( LikeRequest):
     db = SessionLocal()
-    # Проверяем, не лайкал ли уже
     existing = db.query(LikeDB).filter(
         LikeDB.from_user_id == data.from_user_id,
         LikeDB.to_user_id == data.to_user_id
@@ -168,11 +200,9 @@ def like_user(data: LikeRequest):
         db.close()
         return {"status": "already_liked"}
 
-    # Создаём лайк
     new_like = LikeDB(from_user_id=data.from_user_id, to_user_id=data.to_user_id)
     db.add(new_like)
 
-    # Проверяем, есть ли взаимный лайк
     mutual = db.query(LikeDB).filter(
         LikeDB.from_user_id == data.to_user_id,
         LikeDB.to_user_id == data.from_user_id
@@ -186,4 +216,4 @@ def like_user(data: LikeRequest):
 
     db.commit()
     db.close()
-    return {"status": "ok", "is_match": is_match, "matched_user": {"username": None} if not is_match else {"username": data.to_user_id}}
+    return {"status": "ok", "is_match": is_match}
