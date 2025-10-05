@@ -1,18 +1,18 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, and_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
-import uuid
+import random
 
-# --- База данных ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# --- Модели ---
 class UserDB(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -20,79 +20,41 @@ class UserDB(Base):
     username = Column(String, nullable=True)
     first_name = Column(String)
     bio = Column(String, default="")
-    goal = Column(String, default="")  # chat, relationship, sex, hobby
+    goal = Column(String, default="")
     height = Column(Integer, nullable=True)
     weight = Column(Integer, nullable=True)
-    interests = Column(String, default="")  # через запятую: "кино,спорт"
+    interests = Column(String, default="")
     photo_url = Column(String, default="")
     is_premium = Column(Boolean, default=False)
+
+class LikeDB(Base):
+    __tablename__ = "likes"
+    id = Column(Integer, primary_key=True, index=True)
+    from_user_id = Column(Integer, index=True)  # кто лайкнул
+    to_user_id = Column(Integer, index=True)    # кого лайкнули
+    is_mutual = Column(Boolean, default=False)
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- Отдаём главную страницу ---
+# --- Страницы ---
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    html_path = os.path.join(os.path.dirname(__file__), "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "index.html"), "r", encoding="utf-8") as f:
         return f.read()
 
-# --- Отдаём экран профиля ---
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page():
-    html_path = os.path.join(os.path.dirname(__file__), "profile.html")
-    with open(html_path, "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "profile.html"), "r", encoding="utf-8") as f:
         return f.read()
 
-# --- Получаем данные пользователя ---
-@app.get("/api/user/{tg_id}")
-def get_user(tg_id: int):
-    db = SessionLocal()
-    user = db.query(UserDB).filter(UserDB.tg_id == tg_id).first()
-    db.close()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {
-        "tg_id": user.tg_id,
-        "username": user.username,
-        "first_name": user.first_name,
-        "bio": user.bio,
-        "goal": user.goal,
-        "height": user.height,
-        "weight": user.weight,
-        "interests": user.interests.split(",") if user.interests else [],
-        "photo_url": user.photo_url
-    }
+@app.get("/search", response_class=HTMLResponse)
+def search_page():
+    with open(os.path.join(os.path.dirname(__file__), "search.html"), "r", encoding="utf-8") as f:
+        return f.read()
 
-# --- Сохраняем профиль ---
-class ProfileUpdate(BaseModel):
-    tg_id: int
-    bio: str = ""
-    goal: str = ""
-    height: int = None
-    weight: int = None
-    interests: list = []
-
-@app.post("/api/profile")
-def update_profile(data: ProfileUpdate):
-    db = SessionLocal()
-    user = db.query(UserDB).filter(UserDB.tg_id == data.tg_id).first()
-    if not user:
-        db.close()
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    user.bio = data.bio
-    user.goal = data.goal
-    user.height = data.height
-    user.weight = data.weight
-    user.interests = ",".join(data.interests)
-    
-    db.commit()
-    db.close()
-    return {"status": "ok"}
-
-# --- Регистрация (без изменений) ---
+# --- API ---
 class UserRequest(BaseModel):
     tg_id: int
     username: str = None
@@ -106,12 +68,122 @@ def register(user: UserRequest):
         db_user.username = user.username
         db_user.first_name = user.first_name
     else:
-        db_user = UserDB(
-            tg_id=user.tg_id,
-            username=user.username,
-            first_name=user.first_name
-        )
+        db_user = UserDB(tg_id=user.tg_id, username=user.username, first_name=user.first_name)
         db.add(db_user)
     db.commit()
     db.close()
     return {"status": "ok"}
+
+class ProfileUpdate(BaseModel):
+    tg_id: int
+    bio: str = ""
+    goal: str = ""
+    height: int = None
+    weight: int = None
+    interests: list = []
+
+@app.post("/api/profile")
+def update_profile(data: ProfileUpdate):
+    db = SessionLocal()
+    user = db.query(UserDB).filter(UserDB.tg_id == data.tg_id).first()
+    if not user:
+        raise HTTPException(404)
+    user.bio = data.bio
+    user.goal = data.goal
+    user.height = data.height
+    user.weight = data.weight
+    user.interests = ",".join(data.interests)
+    db.commit()
+    db.close()
+    return {"status": "ok"}
+
+@app.get("/api/user/{tg_id}")
+def get_user(tg_id: int):
+    db = SessionLocal()
+    user = db.query(UserDB).filter(UserDB.tg_id == tg_id).first()
+    db.close()
+    if not user:
+        raise HTTPException(404)
+    return {
+        "tg_id": user.tg_id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "bio": user.bio,
+        "goal": user.goal,
+        "height": user.height,
+        "weight": user.weight,
+        "interests": user.interests.split(",") if user.interests else [],
+        "photo_url": user.photo_url
+    }
+
+# --- НОВОЕ: Получить случайного пользователя для поиска ---
+@app.get("/api/search")
+def search_users(current_user_id: int):
+    db = SessionLocal()
+    # Исключаем себя и тех, кого уже лайкал
+    liked_ids = db.query(LikeDB.to_user_id).filter(LikeDB.from_user_id == current_user_id).all()
+    liked_ids = [x[0] for x in liked_ids]
+    liked_ids.append(current_user_id)  # не показывать себя
+
+    users = db.query(UserDB).filter(
+        and_(
+            UserDB.tg_id.notin_(liked_ids),
+            UserDB.tg_id != current_user_id
+        )
+    ).all()
+
+    if not users:
+        return {"user": None}
+
+    # Берём случайного
+    random_user = random.choice(users)
+    db.close()
+    return {
+        "user": {
+            "tg_id": random_user.tg_id,
+            "first_name": random_user.first_name,
+            "bio": random_user.bio,
+            "goal": random_user.goal,
+            "height": random_user.height,
+            "weight": random_user.weight,
+            "interests": random_user.interests.split(",") if random_user.interests else [],
+            "username": random_user.username
+        }
+    }
+
+# --- НОВОЕ: Поставить лайк ---
+class LikeRequest(BaseModel):
+    from_user_id: int
+    to_user_id: int
+
+@app.post("/api/like")
+def like_user(data: LikeRequest):
+    db = SessionLocal()
+    # Проверяем, не лайкал ли уже
+    existing = db.query(LikeDB).filter(
+        LikeDB.from_user_id == data.from_user_id,
+        LikeDB.to_user_id == data.to_user_id
+    ).first()
+    if existing:
+        db.close()
+        return {"status": "already_liked"}
+
+    # Создаём лайк
+    new_like = LikeDB(from_user_id=data.from_user_id, to_user_id=data.to_user_id)
+    db.add(new_like)
+
+    # Проверяем, есть ли взаимный лайк
+    mutual = db.query(LikeDB).filter(
+        LikeDB.from_user_id == data.to_user_id,
+        LikeDB.to_user_id == data.from_user_id
+    ).first()
+
+    is_match = False
+    if mutual:
+        new_like.is_mutual = True
+        mutual.is_mutual = True
+        is_match = True
+
+    db.commit()
+    db.close()
+    return {"status": "ok", "is_match": is_match, "matched_user": {"username": None} if not is_match else {"username": data.to_user_id}}
