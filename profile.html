@@ -44,8 +44,12 @@
       border-radius: 30px;
       width: 100%;
       font-size: 16px;
-      margin-top: 20px;
+      margin-top: 10px;
       cursor: pointer;
+    }
+    .back-btn {
+      background: #2A2A32 !important;
+      margin-top: 0;
     }
     .interests {
       display: flex;
@@ -66,6 +70,8 @@
     <div class="photo">👤</div>
     <h2>Мой профиль</h2>
   </div>
+
+  <button class="btn back-btn" onclick="window.location='https://loveblr.onrender.com'">← Назад в меню</button>
 
   <input type="text" id="bio" placeholder="Расскажи о себе (до 200 символов)">
   
@@ -109,6 +115,9 @@
           document.getElementById('height').value = data.height || '';
           document.getElementById('weight').value = data.weight || '';
           renderInterests(data.interests || []);
+        })
+        .catch(err => {
+          console.error("Ошибка загрузки профиля:", err);
         });
     }
 
@@ -128,7 +137,6 @@
       const input = document.getElementById('newInterest');
       const current = input.value.trim();
       input.value = current ? `${current}, ${tagToRemove}` : tagToRemove;
-      // Перезагрузим список без этого тега
       const container = document.getElementById('interestsContainer');
       const tags = Array.from(container.children)
         .map(el => el.textContent)
@@ -175,8 +183,14 @@
       .then(res => {
         if (res.status === "ok") {
           alert("✅ Профиль сохранён!");
-          // Вернёмся в главное меню (позже сделаем навигацию)
+          setTimeout(() => {
+            window.location.href = 'https://loveblr.onrender.com';
+          }, 1500);
         }
+      })
+      .catch(err => {
+        alert("❌ Ошибка сохранения");
+        console.error(err);
       });
     }
 
