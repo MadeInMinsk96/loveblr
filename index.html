@@ -8,41 +8,79 @@
     body {
       background: #0F0F12;
       color: white;
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       text-align: center;
-      padding-top: 50px;
+      padding-top: 60px;
+      margin: 0;
     }
-    button {
+    .logo {
+      font-size: 32px;
+      margin-bottom: 20px;
+      color: #FF2D75;
+    }
+    .btn {
       background: #FF2D75;
       color: white;
       border: none;
-      padding: 12px 30px;
+      padding: 14px 32px;
       font-size: 18px;
       border-radius: 30px;
       cursor: pointer;
+      margin-top: 20px;
+    }
+    .status {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #B0B0B0;
     }
   </style>
 </head>
 <body>
-  <h1>❤️ SoulMatch</h1>
+  <div class="logo">❤️ SoulMatch</div>
   <p>Знакомства прямо в Telegram</p>
-  <button onclick="login()">Войти через Telegram</button>
+  <button class="btn" onclick="login()">Войти и начать</button>
+  <div class="status" id="status"></div>
 
   <script>
     function login() {
+      const status = document.getElementById('status');
+      const initData = window.Telegram.WebApp.initData;
       const user = window.Telegram.WebApp.initDataUnsafe?.user;
-      if (user) {
-        fetch('https://loveblr.onrender.com/index.html', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(user)
-        }).then(r => r.json()).then(data => {
-          alert('Готово! Профиль создан.');
-        });
-      } else {
-        alert('Открой это приложение внутри Telegram!');
+
+      if (!user) {
+        status.textContent = "Откройте приложение внутри Telegram!";
+        return;
       }
+
+      status.textContent = "Сохраняю профиль...";
+
+      fetch('https://loveblr.onrender.com/index.html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tg_id: user.id,
+          username: user.username,
+          first_name: user.first_name
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === "ok") {
+          status.textContent = "✅ Готово! Переходи в главное меню.";
+          // Через 2 секунды можно перенаправить на профиль или поиск
+          setTimeout(() => {
+            alert("Теперь ты в системе! Скоро добавим поиск и лайки.");
+          }, 2000);
+        } else {
+          status.textContent = "❌ Ошибка: " + data.detail;
+        }
+      })
+      .catch(err => {
+        status.textContent = "❌ Не удалось подключиться к серверу.";
+        console.error(err);
+      });
     }
+
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
   </script>
