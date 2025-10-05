@@ -1,18 +1,14 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-import requests
-import os
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, and_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
 import random
 
-# --- Настройки ---
-IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "819c3afe10daa867a50816100412c7bd")  # замени на свой!
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-# --- База данных ---
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -28,7 +24,7 @@ class UserDB(Base):
     height = Column(Integer, nullable=True)
     weight = Column(Integer, nullable=True)
     interests = Column(String, default="")
-    photo_url = Column(String, default="")
+    photo_url = Column(String, default="")  # оставим поле, но не будем использовать
     is_premium = Column(Boolean, default=False)
 
 class LikeDB(Base):
@@ -42,7 +38,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- Страницы ---
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     with open(os.path.join(os.path.dirname(__file__), "index.html"), "r", encoding="utf-8") as f:
@@ -58,7 +53,6 @@ def search_page():
     with open(os.path.join(os.path.dirname(__file__), "search.html"), "r", encoding="utf-8") as f:
         return f.read()
 
-# --- API ---
 class UserRequest(BaseModel):
     tg_id: int
     username: str = None
@@ -101,38 +95,6 @@ def update_profile( ProfileUpdate):
     db.close()
     return {"status": "ok"}
 
-# --- НОВОЕ: Загрузка фото ---
-@app.post("/api/upload-photo")
-async def upload_photo(tg_id: int, file: UploadFile = File(...)):
-    # Сохраняем файл временно
-    contents = await file.read()
-    temp_path = f"/tmp/{file.filename}"
-    with open(temp_path, "wb") as f:
-        f.write(contents)
-
-    # Отправляем в ImgBB
-    with open(temp_path, "rb") as f:
-        response = requests.post(
-            "https://api.imgbb.com/1/upload",
-            data={"key": IMGBB_API_KEY},
-            files={"image": f}
-        )
-    
-    os.remove(temp_path)
-    if response.status_code != 200:
-        raise HTTPException(500, "Не удалось загрузить фото")
-    
-    photo_url = response.json()["data"]["url"]
-
-    # Сохраняем в базу
-    db = SessionLocal()
-    user = db.query(UserDB).filter(UserDB.tg_id == tg_id).first()
-    if user:
-        user.photo_url = photo_url
-        db.commit()
-    db.close()
-    return {"photo_url": photo_url}
-
 @app.get("/api/user/{tg_id}")
 def get_user(tg_id: int):
     db = SessionLocal()
@@ -149,7 +111,7 @@ def get_user(tg_id: int):
         "height": user.height,
         "weight": user.weight,
         "interests": user.interests.split(",") if user.interests else [],
-        "photo_url": user.photo_url
+        "photo_url": ""  # временно пусто
     }
 
 @app.get("/api/search")
@@ -181,7 +143,7 @@ def search_users(current_user_id: int):
             "weight": random_user.weight,
             "interests": random_user.interests.split(",") if random_user.interests else [],
             "username": random_user.username,
-            "photo_url": random_user.photo_url
+            "photo_url": ""
         }
     }
 
