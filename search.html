@@ -102,7 +102,7 @@
     }
 
     function loadNextUser() {
-      fetch(`/api/search?current_user_id=${currentUserId}`)
+      fetch(`https://loveblr.onrender.com/api/search?current_user_id=${currentUserId}`)
         .then(r => r.json())
         .then(data => {
           const content = document.getElementById('content');
@@ -134,7 +134,7 @@
     }
 
     function like() {
-      fetch('/api/like', {
+      fetch('https://loveblr.onrender.com/api/like', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
