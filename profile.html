@@ -101,7 +101,7 @@
       userTgId = user.id;
 
       // Загружаем данные профиля
-      fetch(`/api/user/${userTgId}`)
+      fetch(`https://loveblr.onrender.com/api/user/${userTgId}`)
         .then(r => r.json())
         .then(data => {
           document.getElementById('bio').value = data.bio || '';
@@ -166,7 +166,7 @@
         interests: interests
       };
 
-      fetch('/api/profile', {
+      fetch('https://loveblr.onrender.com/api/profile', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
