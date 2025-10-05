@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Поиск</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      background: #0F0F12;
+      color: white;
+      font-family: sans-serif;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+    }
+    .photo {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: #2A2A32;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 60px;
+      margin-bottom: 20px;
+    }
+    .name {
+      font-size: 24px;
+      margin: 10px 0;
+    }
+    .bio {
+      color: #B0B0B0;
+      margin: 10px 0;
+    }
+    .interests {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin: 15px 0;
+    }
+    .tag {
+      background: #1E1E24;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 30px;
+    }
+    .btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: none;
+      font-size: 30px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dislike { background: #444; color: white; }
+    .like { background: #FF2D75; color: white; }
+    .empty {
+      text-align: center;
+      margin-top: 50px;
+      color: #B0B0B0;
+    }
+  </style>
+</head>
+<body>
+  <div id="content">
+    <div class="empty">Загрузка...</div>
+  </div>
+
+  <script>
+    let currentUserId = null;
+    let currentUser = null;
+
+    function init() {
+      const user = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (!user) {
+        alert("Откройте в Telegram!");
+        return;
+      }
+      currentUserId = user.id;
+      loadNextUser();
+    }
+
+    function loadNextUser() {
+      fetch(`/api/search?current_user_id=${currentUserId}`)
+        .then(r => r.json())
+        .then(data => {
+          const content = document.getElementById('content');
+          if (!data.user) {
+            content.innerHTML = `<div class="empty">Больше нет профилей 😢<br>Приходи позже!</div>`;
+            return;
+          }
+          currentUser = data.user;
+          content.innerHTML = `
+            <div class="card">
+              <div class="photo">👤</div>
+              <div class="name">${currentUser.first_name}, ${currentUser.height ? currentUser.height + ' см' : ''}</div>
+              <div class="bio">${currentUser.bio || 'Расскажет о себе позже'}</div>
+              <div class="interests">
+                ${(currentUser.interests || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
+              </div>
+              <div class="buttons">
+                <button class="btn dislike" onclick="skip()">✕</button>
+                <button class="btn like" onclick="like()">❤️</button>
+              </div>
+            </div>
+          `;
+        });
+    }
+
+    function skip() {
+      // Просто загружаем следующего
+      loadNextUser();
+    }
+
+    function like() {
+      fetch('/api/like', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          from_user_id: currentUserId,
+          to_user_id: currentUser.tg_id
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.is_match) {
+          // МАТЧ!
+          const username = currentUser.username || `id${currentUser.tg_id}`;
+          const telegramLink = `https://t.me/${username}`;
+          if (confirm(`💞 Взаимный лайк!\nХочешь написать ${currentUser.first_name}?`)) {
+            window.open(telegramLink, '_blank');
+          }
+        }
+        loadNextUser(); // показываем следующего
+      });
+    }
+
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+    init();
+  </script>
+</body>
+</html>
