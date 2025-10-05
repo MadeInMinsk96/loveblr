@@ -27,6 +27,8 @@
       border-radius: 30px;
       cursor: pointer;
       margin-top: 20px;
+      width: 80%;
+      max-width: 300px;
     }
     .status {
       margin-top: 20px;
@@ -41,10 +43,14 @@
   <button class="btn" onclick="login()">Войти и начать</button>
   <div class="status" id="status"></div>
 
+  <div style="margin-top: 30px;">
+    <button class="btn" style="background:#2A2A32;" onclick="window.location='/profile'">Редактировать профиль</button>
+    <button class="btn" style="background:#2A2A32;margin-top:10px;" onclick="window.location='/search'">🔍 Поиск партнёра</button>
+  </div>
+
   <script>
     function login() {
       const status = document.getElementById('status');
-      const initData = window.Telegram.WebApp.initData;
       const user = window.Telegram.WebApp.initDataUnsafe?.user;
 
       if (!user) {
@@ -66,11 +72,7 @@
       .then(response => response.json())
       .then(data => {
         if (data.status === "ok") {
-          status.textContent = "✅ Готово! Переходи в главное меню.";
-          // Через 2 секунды можно перенаправить на профиль или поиск
-          setTimeout(() => {
-            alert("Теперь ты в системе! Скоро добавим поиск и лайки.");
-          }, 2000);
+          status.textContent = "✅ Готово! Профиль создан.";
         } else {
           status.textContent = "❌ Ошибка: " + data.detail;
         }
@@ -84,11 +86,5 @@
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
   </script>
-  <div style="margin-top: 30px;">
-  <button class="btn" onclick="window.location='/profile'">Редактировать профиль</button>
-    <div style="margin-top: 20px;">
-  <button class="btn" onclick="window.location='/search'">🔍 Поиск партнёра</button>
-</div>
-</div>
 </body>
 </html>
