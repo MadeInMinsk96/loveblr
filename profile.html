@@ -26,11 +26,6 @@
       align-items: center;
       justify-content: center;
       font-size: 40px;
-      cursor: pointer;
-    }
-    .photo img {
-      width: 100%;
-      border-radius: 50%;
     }
     input, textarea, select {
       width: 100%;
@@ -72,8 +67,7 @@
 </head>
 <body>
   <div class="header">
-    <div class="photo" id="photoPreview" onclick="document.getElementById('photoInput').click()">👤</div>
-    <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto()">
+    <div class="photo">👤</div>
     <h2>Мой профиль</h2>
   </div>
 
@@ -119,9 +113,6 @@
           document.getElementById('height').value = data.height || '';
           document.getElementById('weight').value = data.weight || '';
           renderInterests(data.interests || []);
-          if (data.photo_url) {
-            document.getElementById('photoPreview').innerHTML = `<img src="${data.photo_url}">`;
-          }
         })
         .catch(err => {
           console.error("Ошибка загрузки профиля:", err);
@@ -168,29 +159,6 @@
         container.appendChild(el);
         input.value = '';
       }
-    }
-
-    function uploadPhoto() {
-      const fileInput = document.getElementById('photoInput');
-      const file = fileInput.files[0];
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('tg_id', userTgId);
-
-      fetch('https://loveblr.onrender.com/api/upload-photo', {
-        method: 'POST',
-        body: formData
-      })
-      .then(r => r.json())
-      .then(data => {
-        document.getElementById('photoPreview').innerHTML = `<img src="${data.photo_url}">`;
-      })
-      .catch(err => {
-        alert("Не удалось загрузить фото");
-        console.error(err);
-      });
     }
 
     function saveProfile() {
