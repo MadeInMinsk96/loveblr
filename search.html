@@ -35,10 +35,6 @@
       font-size: 60px;
       margin-bottom: 20px;
     }
-    .photo img {
-      width: 100%;
-      border-radius: 50%;
-    }
     .name {
       font-size: 24px;
       margin: 10px 0;
@@ -127,12 +123,9 @@
             return;
           }
           currentUser = data.user;
-          const photoHtml = currentUser.photo_url 
-            ? `<img src="${currentUser.photo_url}">` 
-            : '👤';
           content.innerHTML = `
             <div class="card">
-              <div class="photo">${photoHtml}</div>
+              <div class="photo">👤</div>
               <div class="name">${currentUser.first_name}${currentUser.height ? ', ' + currentUser.height + ' см' : ''}</div>
               <div class="bio">${currentUser.bio || 'Расскажет о себе позже'}</div>
               <div class="interests">
