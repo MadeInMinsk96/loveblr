@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Мой профиль</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      background: #0F0F12;
+      color: white;
+      font-family: sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .photo {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #333;
+      margin: 0 auto 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      background: #1E1E24;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: white;
+    }
+    .btn {
+      background: #FF2D75;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 30px;
+      width: 100%;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .interests {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .interest-tag {
+      background: #2A2A32;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="photo">👤</div>
+    <h2>Мой профиль</h2>
+  </div>
+
+  <input type="text" id="bio" placeholder="Расскажи о себе (до 200 символов)">
+  
+  <select id="goal">
+    <option value="">Цель знакомства</option>
+    <option value="chat">💬 Общение</option>
+    <option value="relationship">❤️ Отношения</option>
+    <option value="sex">🔥 S#X</option>
+    <option value="hobby">🎮 Хобби</option>
+  </select>
+
+  <input type="number" id="height" placeholder="Рост (см)">
+  <input type="number" id="weight" placeholder="Вес (кг)">
+
+  <div>Интересы (выбери или введи свои):</div>
+  <div class="interests" id="interestsContainer">
+    <!-- Теги будут здесь -->
+  </div>
+  <input type="text" id="newInterest" placeholder="Добавить интерес (например: кино)">
+
+  <button class="btn" onclick="saveProfile()">Сохранить профиль</button>
+
+  <script>
+    let userTgId = null;
+    const allInterests = ["кино", "спорт", "путешествия", "книги", "игры", "фитнес", "музыка", "еда", "наука", "искусство"];
+
+    function init() {
+      const user = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (!user) {
+        alert("Откройте в Telegram!");
+        return;
+      }
+      userTgId = user.id;
+
+      // Загружаем данные профиля
+      fetch(`/api/user/${userTgId}`)
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('bio').value = data.bio || '';
+          document.getElementById('goal').value = data.goal || '';
+          document.getElementById('height').value = data.height || '';
+          document.getElementById('weight').value = data.weight || '';
+          renderInterests(data.interests || []);
+        });
+    }
+
+    function renderInterests(interests) {
+      const container = document.getElementById('interestsContainer');
+      container.innerHTML = '';
+      interests.forEach(tag => {
+        const el = document.createElement('div');
+        el.className = 'interest-tag';
+        el.textContent = tag;
+        el.onclick = () => removeInterest(tag);
+        container.appendChild(el);
+      });
+    }
+
+    function removeInterest(tagToRemove) {
+      const input = document.getElementById('newInterest');
+      const current = input.value.trim();
+      input.value = current ? `${current}, ${tagToRemove}` : tagToRemove;
+      // Перезагрузим список без этого тега
+      const container = document.getElementById('interestsContainer');
+      const tags = Array.from(container.children)
+        .map(el => el.textContent)
+        .filter(t => t !== tagToRemove);
+      renderInterests(tags);
+    }
+
+    document.getElementById('newInterest').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addInterest();
+      }
+    });
+
+    function addInterest() {
+      const input = document.getElementById('newInterest');
+      const value = input.value.trim().toLowerCase();
+      if (value && !document.getElementById('interestsContainer').textContent.includes(value)) {
+        const container = document.getElementById('interestsContainer');
+        const el = document.createElement('div');
+        el.className = 'interest-tag';
+        el.textContent = value;
+        container.appendChild(el);
+        input.value = '';
+      }
+    }
+
+    function saveProfile() {
+      const interests = Array.from(document.querySelectorAll('.interest-tag')).map(el => el.textContent);
+      const data = {
+        tg_id: userTgId,
+        bio: document.getElementById('bio').value,
+        goal: document.getElementById('goal').value,
+        height: parseInt(document.getElementById('height').value) || null,
+        weight: parseInt(document.getElementById('weight').value) || null,
+        interests: interests
+      };
+
+      fetch('/api/profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === "ok") {
+          alert("✅ Профиль сохранён!");
+          // Вернёмся в главное меню (позже сделаем навигацию)
+        }
+      });
+    }
+
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+    init();
+  </script>
+</body>
+</html>
