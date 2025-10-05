@@ -35,6 +35,10 @@
       font-size: 60px;
       margin-bottom: 20px;
     }
+    .photo img {
+      width: 100%;
+      border-radius: 50%;
+    }
     .name {
       font-size: 24px;
       margin: 10px 0;
@@ -80,9 +84,21 @@
       margin-top: 50px;
       color: #B0B0B0;
     }
+    .back-btn {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: #2A2A32;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <button class="back-btn" onclick="window.location='https://loveblr.onrender.com'">← Меню</button>
   <div id="content">
     <div class="empty">Загрузка...</div>
   </div>
@@ -111,10 +127,13 @@
             return;
           }
           currentUser = data.user;
+          const photoHtml = currentUser.photo_url 
+            ? `<img src="${currentUser.photo_url}">` 
+            : '👤';
           content.innerHTML = `
             <div class="card">
-              <div class="photo">👤</div>
-              <div class="name">${currentUser.first_name}, ${currentUser.height ? currentUser.height + ' см' : ''}</div>
+              <div class="photo">${photoHtml}</div>
+              <div class="name">${currentUser.first_name}${currentUser.height ? ', ' + currentUser.height + ' см' : ''}</div>
               <div class="bio">${currentUser.bio || 'Расскажет о себе позже'}</div>
               <div class="interests">
                 ${(currentUser.interests || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
@@ -129,7 +148,6 @@
     }
 
     function skip() {
-      // Просто загружаем следующего
       loadNextUser();
     }
 
@@ -145,14 +163,13 @@
       .then(r => r.json())
       .then(res => {
         if (res.is_match) {
-          // МАТЧ!
           const username = currentUser.username || `id${currentUser.tg_id}`;
           const telegramLink = `https://t.me/${username}`;
           if (confirm(`💞 Взаимный лайк!\nХочешь написать ${currentUser.first_name}?`)) {
             window.open(telegramLink, '_blank');
           }
         }
-        loadNextUser(); // показываем следующего
+        loadNextUser();
       });
     }
 
