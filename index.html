@@ -32,7 +32,7 @@
     function login() {
       const user = window.Telegram.WebApp.initDataUnsafe?.user;
       if (user) {
-        fetch('https://loveblr.onrender.com/register', {
+        fetch('https://loveblr.onrender.com/index.html', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(user)
